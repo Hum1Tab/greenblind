@@ -2,7 +2,8 @@
 
 Status: **complete**
 
-Base: `19ddb972845ab0e5b9b7449d3fd5930781407441`  
+Base: `19ddb972845ab0e5b9b7449d3fd5930781407441`
+
 Head: `d032cab7798c7a072ecbb8ade4dfa50030c75cb5`
 
 | Change | Command outcome after removal |

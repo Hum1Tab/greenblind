@@ -12,7 +12,7 @@ NOTE = ("Unnoticed means the selected command still exited 0 after one change wa
 
 def markdown(report):
     rows = ["# Greenblind report", "", f"Status: **{report['status']}**", "",
-            f"Base: `{report['base']}`  ", f"Head: `{report['head']}`", "",
+            f"Base: `{report['base']}`", "", f"Head: `{report['head']}`", "",
             "| Change | Command outcome after removal |", "| --- | --- |"]
     for item in report["results"]:
         name = item['file'].replace('|', '\\|').replace('\n', ' ')
