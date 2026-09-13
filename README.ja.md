@@ -14,6 +14,14 @@ Python 3.11以上とGitが必要です。`.greenblind/demo/report.html` を開�
 
 別のリポジトリで使う場合:
 
+まず `plan` で対象と実行回数を確認できます。この段階ではリポジトリ内のコードを実行しません。
+
+```sh
+python -m greenblind plan --repo /path/to/project --base HEAD~1 --include "src/*"
+```
+
+その後、同じ対象を検証します:
+
 ```sh
 python -m greenblind check --repo /path/to/project --base HEAD~1 --include "src/*" -- python -m unittest discover -s tests
 ```

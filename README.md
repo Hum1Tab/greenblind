@@ -19,6 +19,8 @@ The shipping fix disappeared. The tests still passed.
 
 **Real-history check:** in more-itertools, a guard removal went unnoticed before its regression tests were added and was rejected afterward. [Reproduce the comparison](docs/case-study.md).
 
+A second [focused Node example](docs/node-example.md) checks an ansi-regex change without third-party dependencies.
+
 ![A real Greenblind demo report showing one unnoticed shipping change and one rejected discount change](docs/assets/demo.png)
 
 ## Try it in 30 seconds
@@ -32,6 +34,14 @@ python -m greenblind demo
 Open `.greenblind/demo/report.html`. The demo creates a disposable Git repository, runs real tests seven times, and leaves your checkout alone. It needs no package installation or network after cloning. On systems where Python is named `python3`, use that instead.
 
 ## Check your change
+
+Preview the scope first. This reads Git objects but does not execute repository code:
+
+```sh
+python -m greenblind plan --repo /path/to/project --base HEAD~1 --include "src/*"
+```
+
+The plan lists region IDs, intentional exclusions, unsupported files, the probe budget, and the number of command executions. Add `--json` for scripts. It cannot predict whether dependencies are installed or tests will pass. A plan's exit 0 means planning succeeded, not that any test ran.
 
 From the Greenblind checkout, install into a virtual environment:
 
@@ -80,7 +90,7 @@ Every check writes a standalone HTML report, machine-readable JSON, and Markdown
 greenblind check --base HEAD~1 --include "src/*" --limit 20 --timeout 30 --repeats 2 --fail-on-unnoticed -- python -m pytest -q
 ```
 
-For `N` regions and `R` repeats, a full check runs the command `R × (N + 1) + 1` times. Defaults: 30 regions, 2 repeats, 60 seconds per run. Budget omissions and unsupported selected files produce a partial report rather than a clean result.
+For `N` regions and `R` repeats, a full check runs the command `R × (N + 1) + 1` times. An empty plan runs no commands. Defaults: 30 regions, 2 repeats, 60 seconds per run. Budget omissions and unsupported selected files produce a partial report rather than a clean result. Intentional `--exclude` matches remain visible but do not make the report partial.
 
 | Exit | Meaning |
 | --- | --- |

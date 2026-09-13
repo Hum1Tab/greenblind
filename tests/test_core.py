@@ -1,11 +1,14 @@
 import json
+from contextlib import redirect_stdout
+from io import StringIO
 from pathlib import Path
 import shutil
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
-from greenblind.core import audit, classify, git, materialize, plan, run_command, safe_path, snapshot
+from greenblind.core import audit, classify, git, materialize, plan, preview, run_command, safe_path, snapshot
 from greenblind.demo import commit, OLD, NEW, TEST
 from greenblind.report import html, write
 
@@ -122,8 +125,43 @@ class IntegrationTests(unittest.TestCase):
         self.assertTrue(all(r['outcome'] == 'unnoticed' for r in report['results']))
 
     def test_empty_plan_is_not_success(self):
-        report = audit(self.repo, 'HEAD', 'HEAD', ['shop.py'], [], [sys.executable, '-c', 'pass'])
+        with patch('greenblind.core.run_command', side_effect=AssertionError('must not execute')):
+            report = audit(self.repo, 'HEAD', 'HEAD', ['shop.py'], [], [sys.executable, '-c', 'pass'])
         self.assertEqual(report['status'], 'no_probes')
+
+    def test_preview_does_not_execute_and_matches_audit(self):
+        with patch('greenblind.core.run_command', side_effect=AssertionError('must not execute')):
+            planned = preview(self.repo, 'HEAD~1', 'HEAD', ['shop.py'], [], limit=1)
+        actual = self.check(limit=1)
+        self.assertEqual(planned['probes'][0]['id'], actual['results'][0]['id'])
+        self.assertEqual(planned['command_executions'], 5)
+        self.assertEqual(planned['omitted_probes'], 1)
+
+    def test_cli_plan_is_machine_readable_without_execution(self):
+        from greenblind.cli import main
+        output = StringIO()
+        with redirect_stdout(output), patch('greenblind.core.run_command', side_effect=AssertionError('must not execute')):
+            status = main(['plan', '--repo', str(self.repo), '--base', 'HEAD~1', '--include', 'shop.py', '--json'])
+        self.assertEqual(status, 0)
+        self.assertEqual(json.loads(output.getvalue())['command_executions'], 7)
+
+    def test_nonfinite_timeouts_fail_before_running(self):
+        for timeout in (float('nan'), float('inf'), -1):
+            with self.subTest(timeout=timeout), self.assertRaises(ValueError):
+                preview(self.repo, 'HEAD~1', 'HEAD', ['shop.py'], [], timeout=timeout)
+
+    def test_intentional_excludes_do_not_make_a_complete_run_partial(self):
+        result = audit(self.repo, 'HEAD~1', 'HEAD', ['*.py'], ['test_*.py'],
+                       [sys.executable, '-m', 'unittest', 'discover'])
+        self.assertEqual(result['status'], 'complete')
+        self.assertEqual(result['skipped'], [{'file': 'test_shop.py', 'reason': 'excluded'}])
+
+    def test_unsupported_selected_files_still_make_run_partial(self):
+        (self.repo / 'data.bin').write_bytes(b'\0binary')
+        commit(self.repo, 'binary')
+        result = audit(self.repo, 'HEAD~2', 'HEAD', ['shop.py', '*.bin'], [],
+                       [sys.executable, '-m', 'unittest', 'discover'])
+        self.assertEqual(result['status'], 'partial')
 
     def test_git_export_ignore_does_not_hide_files(self):
         (self.repo / '.gitattributes').write_text('shop.py export-ignore\n', encoding='utf-8')

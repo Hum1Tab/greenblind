@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 import difflib
 import fnmatch
 import hashlib
+import math
 import os
 from pathlib import Path, PurePosixPath
 import signal
@@ -187,19 +188,40 @@ def classify(runs):
     return "unnoticed" if codes == {0} else "rejected"
 
 
-def audit(repo, base_ref, head_ref, includes, excludes, command, repeats=2,
-          timeout=60, limit=30, progress=lambda message: None):
-    if repeats < 2 or timeout <= 0 or limit < 1:
+def prepare(repo, base_ref, head_ref, includes, excludes, repeats=2, timeout=60, limit=30):
+    """Build the same immutable plan for preview and execution."""
+    if repeats < 2 or not math.isfinite(timeout) or timeout <= 0 or limit < 1:
         raise ValueError("Require repeats >= 2, timeout > 0, and limit >= 1")
     base_sha, head_sha = revision(repo, base_ref), revision(repo, head_ref)
     base, head = snapshot(repo, base_sha), snapshot(repo, head_sha)
     probes, skipped = plan(base, head, includes, excludes)
     report = {"schema_version": 1, "created_at": datetime.now(timezone.utc).isoformat(),
               "base": base_sha, "head": head_sha,
-              "command": command, "includes": includes, "excludes": excludes,
+              "includes": includes, "excludes": excludes,
               "repeats": repeats, "timeout": timeout, "total_probes": len(probes),
               "omitted_probes": max(0, len(probes) - limit), "skipped": skipped,
               "baseline": [], "final_baseline": [], "results": [], "status": "complete"}
+    return report, base, head, probes
+
+
+def preview(repo, base_ref, head_ref, includes, excludes, repeats=2, timeout=60, limit=30):
+    report, _, _, probes = prepare(repo, base_ref, head_ref, includes, excludes, repeats, timeout, limit)
+    count = min(len(probes), limit)
+    executions = repeats * (count + 1) + 1 if count else 0
+    return {"schema_version": 1, "status": "planned", "base": report['base'], "head": report['head'],
+            "includes": includes, "excludes": excludes, "repeats": repeats,
+            "total_probes": len(probes), "omitted_probes": report['omitted_probes'],
+            "command_executions": executions, "command_timeout_ceiling_seconds": executions * timeout,
+            "skipped": report['skipped'], "probes": [p.public() for p in probes[:limit]]}
+
+
+def audit(repo, base_ref, head_ref, includes, excludes, command, repeats=2,
+          timeout=60, limit=30, progress=lambda message: None):
+    report, base, head, probes = prepare(repo, base_ref, head_ref, includes, excludes, repeats, timeout, limit)
+    report['command'] = command
+    if not probes:
+        report['status'] = 'no_probes'
+        return report
 
     def execute(probe=None):
         with tempfile.TemporaryDirectory(prefix="greenblind-") as tmp:
@@ -229,8 +251,6 @@ def audit(repo, base_ref, head_ref, includes, excludes, command, repeats=2,
     report["final_baseline"] = [execute()]
     if classify(report["final_baseline"]) != "unnoticed":
         report["status"] = "baseline_drift"
-    elif not probes:
-        report["status"] = "no_probes"
-    elif report["omitted_probes"] or skipped:
+    elif report["omitted_probes"] or any(item['reason'] != 'excluded' for item in report['skipped']):
         report["status"] = "partial"
     return report

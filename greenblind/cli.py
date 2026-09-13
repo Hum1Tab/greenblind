@@ -1,8 +1,9 @@
 import argparse
+import json
 from pathlib import Path
 import sys
 
-from .core import audit
+from .core import audit, preview
 from .report import write
 
 
@@ -11,21 +12,39 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="action", required=True)
     demo = sub.add_parser("demo", help="Run a real, disposable example with Python and Git")
     demo.add_argument("--output", type=Path, default=Path(".greenblind/demo"))
-    run = sub.add_parser("check", help="Probe two committed revisions; run only trusted code")
-    run.add_argument("--repo", type=Path, default=Path.cwd())
-    run.add_argument("--base", required=True, help="Exact base revision (use a merge-base for PRs)")
-    run.add_argument("--head", default="HEAD")
-    run.add_argument("--include", action="append", required=True, help="Production file/glob to probe, repeatable; quote globs")
-    run.add_argument("--exclude", action="append", default=[], help="Files/globs to leave unchanged")
-    run.add_argument("--repeats", type=int, default=2)
-    run.add_argument("--timeout", type=float, default=60)
-    run.add_argument("--limit", type=int, default=30, help="Maximum changed regions to probe")
+    scope = argparse.ArgumentParser(add_help=False)
+    scope.add_argument("--repo", type=Path, default=Path.cwd())
+    scope.add_argument("--base", required=True, help="Exact base revision (use a merge-base for PRs)")
+    scope.add_argument("--head", default="HEAD")
+    scope.add_argument("--include", action="append", required=True, help="Production file/glob to probe, repeatable; quote globs")
+    scope.add_argument("--exclude", action="append", default=[], help="Files/globs to leave unchanged")
+    scope.add_argument("--repeats", type=int, default=2)
+    scope.add_argument("--timeout", type=float, default=60)
+    scope.add_argument("--limit", type=int, default=30, help="Maximum changed regions to probe")
+    run = sub.add_parser("check", parents=[scope], help="Probe two committed revisions; run only trusted code")
     run.add_argument("--output", type=Path, default=Path(".greenblind"))
     run.add_argument("--include-logs", action="store_true")
     run.add_argument("--fail-on-unnoticed", action="store_true")
     run.add_argument("command", nargs=argparse.REMAINDER, help="Command argv after -- (no shell)")
+    planning = sub.add_parser('plan', parents=[scope], help='Preview changes and cost without running repository code')
+    planning.add_argument('--json', action='store_true', help='Print a machine-readable plan to stdout')
     args = parser.parse_args(argv)
     try:
+        if args.action == 'plan':
+            result = preview(args.repo.resolve(), args.base, args.head, args.include, args.exclude,
+                             args.repeats, args.timeout, args.limit)
+            if args.json:
+                print(json.dumps(result, indent=2))
+            else:
+                print(f"Greenblind plan: {len(result['probes'])}/{result['total_probes']} regions")
+                for item in result['probes']:
+                    print(f"  {item['id']}  {item['file']}:{item['start']}-{item['end']}")
+                for item in result['skipped']:
+                    print(f"  {item['reason']}: {item['file']}")
+                print(f"Command executions: {result['command_executions']} (if baselines pass)")
+                print(f"Command timeout ceiling: {result['command_timeout_ceiling_seconds']:g}s; snapshot overhead is additional")
+                print(f"Budget omissions: {result['omitted_probes']}. No repository code was executed.")
+            return 0
         if args.action == "demo":
             from .demo import demo as run_demo
             report = run_demo(args.output)
@@ -41,6 +60,8 @@ def main(argv=None):
         for result in report["results"]:
             print(f"  {result['outcome']:12} {result['file']}:{result['start']}")
         print(f"Report: {(args.output / 'report.html').resolve()}")
+        if report['status'] == 'baseline_failed':
+            print('The unchanged HEAD command did not pass. Check dependencies and the command; export baseline logs with --include-logs.', file=sys.stderr)
         if report["status"] in ("baseline_failed", "baseline_drift", "no_probes", "partial"):
             return 2
         if any(r['outcome'] in ('inconclusive', 'unstable') for r in report['results']):
