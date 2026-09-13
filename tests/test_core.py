@@ -43,7 +43,7 @@ class ProbeTests(unittest.TestCase):
         self.assertEqual(skipped[0]['reason'], 'file mode changed')
 
     def test_unsafe_paths(self):
-        for name in ('../escape', '/escape', 'C:/escape', '.git/config', 'a\\b'):
+        for name in ('../escape', '/escape', 'C:/escape', '.git/config', '.GIT/config', 'a\\b'):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 safe_path(name)
 
@@ -130,6 +130,14 @@ class IntegrationTests(unittest.TestCase):
         commit(self.repo, 'attributes')
         files = snapshot(self.repo, 'HEAD')
         self.assertIn('shop.py', files)
+
+    def test_symlink_objects_are_rejected_without_materializing(self):
+        blob = git(self.repo, 'rev-parse', 'HEAD:shop.py').decode().strip()
+        git(self.repo, 'update-index', '--add', '--cacheinfo', f'120000,{blob},link')
+        git(self.repo, '-c', 'user.name=Test', '-c', 'user.email=test@example.invalid',
+            '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=/dev/null', 'commit', '-qm', 'link object')
+        with self.assertRaisesRegex(ValueError, 'Symlinks/submodules'):
+            snapshot(self.repo, 'HEAD')
 
     def test_reports_escape_source_and_omit_logs(self):
         report = self.check()

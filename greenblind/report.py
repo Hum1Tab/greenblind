@@ -26,7 +26,7 @@ def html(report):
     cards = "".join(f'<div class="stat {key}"><b>{counts[key]}</b><span>{key}</span></div>'
                     for key in ("unnoticed", "rejected", "unstable", "inconclusive"))
     changes = []
-    for row in report["results"]:
+    for row in sorted(report["results"], key=lambda r: r['outcome'] != 'unnoticed'):
         logs = "".join(f'<details><summary>Run {i+1}: exit {run["exit_code"]} · {run["seconds"]}s</summary>'
                        f'<pre>{escape(run.get("log", "Logs omitted. Use --include-logs to export them."))}</pre></details>'
                        for i, run in enumerate(row["runs"]))
@@ -56,7 +56,7 @@ details{font-size:13px;color:#a6b8aa}summary{cursor:pointer;padding:7px 0}footer
 @media(max-width:640px){body{padding:24px 16px}.stats{grid-template-columns:1fr 1fr}.diff{grid-template-columns:1fr}.row{align-items:flex-start;flex-direction:column}article{padding:18px}}
 </style><header><div class="brand">GREENBLIND / CHANGE AUDIT</div><h1>Green tests.<br>What did they miss?</h1><p class="intro">Remove one change. Run the same command. See what stays green.</p></header>''' + (
         f'<div class="meta">{escape(report["base"][:12])} → {escape(report["head"][:12])} · status: {escape(report["status"])}'
-        f'<br>Command argv: {escape(json.dumps(report["command"]))}</div><div class="stats">{cards}</div>'
+        f'<br>Command: {escape(json.dumps([report["command"][0].replace(chr(92), "/").split("/")[-1], *report["command"][1:]]))}</div><div class="stats">{cards}</div>'
         f'<p class="notice">{escape(NOTE)}</p><details><summary>Baseline checks</summary>{baselines}</details>{"".join(changes)}'
         f'<footer>{report["omitted_probes"]} probes omitted by budget. {len(report["skipped"])} files skipped.<ul>{skip}</ul>'
         'Generated locally by Greenblind. No external scripts, fonts, or analytics.</footer></html>')
