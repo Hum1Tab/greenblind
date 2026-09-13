@@ -17,6 +17,8 @@ The shipping fix disappeared. The tests still passed.
 
 [日本語](README.ja.md) · [How it works](docs/design.md) · [Related work](docs/related-work.md)
 
+**Real-history check:** in more-itertools, a guard removal went unnoticed before its regression tests were added and was rejected afterward. [Reproduce the comparison](docs/case-study.md).
+
 ![A real Greenblind demo report showing one unnoticed shipping change and one rejected discount change](docs/assets/demo.png)
 
 ## Try it in 30 seconds

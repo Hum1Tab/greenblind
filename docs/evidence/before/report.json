@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "created_at": "2026-09-13T16:54:14.918009+00:00",
+  "base": "19ddb972845ab0e5b9b7449d3fd5930781407441",
+  "head": "d032cab7798c7a072ecbb8ade4dfa50030c75cb5",
+  "command": [
+    "python",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "tests"
+  ],
+  "includes": [
+    "more_itertools/more.py"
+  ],
+  "excludes": [],
+  "repeats": 2,
+  "timeout": 90.0,
+  "total_probes": 2,
+  "omitted_probes": 0,
+  "skipped": [],
+  "baseline": [
+    {
+      "status": "completed",
+      "exit_code": 0,
+      "seconds": 11.718
+    },
+    {
+      "status": "completed",
+      "exit_code": 0,
+      "seconds": 10.984
+    }
+  ],
+  "final_baseline": [
+    {
+      "status": "completed",
+      "exit_code": 0,
+      "seconds": 11.75
+    }
+  ],
+  "results": [
+    {
+      "id": "265a9ad3f342",
+      "file": "more_itertools/more.py",
+      "start": 4941,
+      "end": 4941,
+      "before": "    limited:\n",
+      "after": "    limited. It must be greater than zero:\n",
+      "outcome": "unnoticed",
+      "runs": [
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "seconds": 11.141
+        },
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "seconds": 12.219
+        }
+      ]
+    },
+    {
+      "id": "274639f823f0",
+      "file": "more_itertools/more.py",
+      "start": 4955,
+      "end": 4956,
+      "before": "",
+      "after": "    if max_count is not None and max_count <= 0:\n        raise ValueError('maximum count must be greater than zero')\n",
+      "outcome": "unnoticed",
+      "runs": [
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "seconds": 12.266
+        },
+        {
+          "status": "completed",
+          "exit_code": 0,
+          "seconds": 10.266
+        }
+      ]
+    }
+  ],
+  "status": "complete"
+}
